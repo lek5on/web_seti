@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <string>
+#include <conio.h> // Для _kbhit() и _getch() (Windows)
 
 using namespace std;
 
@@ -11,39 +12,58 @@ int main() {
 
     string filename = "abc.txt";
 
-    ifstream file(filename);
-    if (!file) {
-        cout << "Файл не открыт!\n\n";
-        return 1;
-    } else {
-        cout << "Все ОК! Файл открыт!\n\n";
-    }
-
-    file.seekg(0, ios::end);
-    int s1 = file.tellg();
-    int s2 = s1;
-    file.close();
-
     while (true) {
-        this_thread::sleep_for(chrono::seconds(2));
-        cout << "Файл тот же!" << endl;
-        this_thread::sleep_for(chrono::seconds(3));
-
         ifstream file(filename);
-        file.seekg(0, ios::end);
-        s2 = file.tellg();
-
-        if (s2 != s1) {
-            file.seekg(0, ios::beg); // Возвращаемся в начало
-            string line, lastLine;
-            while (getline(file, line)) { // Читаем файл построчно
-                lastLine = line; // Запоминаем последнюю строку
-            }
-            cout << "Последняя строка: " << lastLine << endl;
+        if (!file) {
+            cout << "Файл не открыт!\n\n";
+            return 1;
+        } else {
+            cout << "Все ОК! Файл открыт!\n\n";
         }
 
+        file.seekg(0, ios::end);
+        int s1 = file.tellg();
+        int s2 = s1;
         file.close();
-        s1 = s2;
+
+        while (true) {
+            this_thread::sleep_for(chrono::seconds(2));
+            cout << "Файл тот же!" << endl;
+            this_thread::sleep_for(chrono::seconds(3));
+
+            if (_kbhit()) { // Проверяем нажатие клавиши
+                char key = _getch();
+                if (key == 27) { // ESC (код 27) - выход
+                    cout << "Выход из программы." << endl;
+                    return 0;
+                }
+                if (key == 13) { // Enter (код 13) - перезапуск
+                    cout << "Перезапуск...\n";
+                    break;
+                }
+            }
+
+            ifstream file(filename);
+            file.seekg(0, ios::end);
+            s2 = file.tellg();
+
+            if (s2 != s1) {
+                file.seekg(0, ios::beg);
+                string line, lastLine;
+                while (getline(file, line)) {
+                    if (!line.empty()) {
+                        lastLine = line;
+                    }
+                }
+
+                if (!lastLine.empty()) {
+                    cout << "Последняя строка: " << lastLine << endl;
+                }
+            }
+
+            file.close();
+            s1 = s2;
+        }
     }
 
     return 0;
