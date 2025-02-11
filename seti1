@@ -1,0 +1,50 @@
+#include <fstream>
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <string>
+
+using namespace std;
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    string filename = "abc.txt";
+
+    ifstream file(filename);
+    if (!file) {
+        cout << "Файл не открыт!\n\n";
+        return 1;
+    } else {
+        cout << "Все ОК! Файл открыт!\n\n";
+    }
+
+    file.seekg(0, ios::end);
+    int s1 = file.tellg();
+    int s2 = s1;
+    file.close();
+
+    while (true) {
+        this_thread::sleep_for(chrono::seconds(2));
+        cout << "Файл тот же!" << endl;
+        this_thread::sleep_for(chrono::seconds(3));
+
+        ifstream file(filename);
+        file.seekg(0, ios::end);
+        s2 = file.tellg();
+
+        if (s2 != s1) {
+            file.seekg(0, ios::beg); // Возвращаемся в начало
+            string line, lastLine;
+            while (getline(file, line)) { // Читаем файл построчно
+                lastLine = line; // Запоминаем последнюю строку
+            }
+            cout << "Последняя строка: " << lastLine << endl;
+        }
+
+        file.close();
+        s1 = s2;
+    }
+
+    return 0;
+}
