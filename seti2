@@ -3,14 +3,13 @@
 #include <thread>
 #include <chrono>
 #include <string>
-#include <conio.h> // Для _kbhit() и _getch() (Windows)
+#include <conio.h> 
 #include <sstream>
 #include <vector>
-#include <iomanip> // Для форматирования времени
-
+#include <iomanip> 
 using namespace std;
 
-// Функция для вычисления средней оценки
+
 double calculateAverage(const vector<int>& grades) {
     double sum = 0;
     for (int grade : grades) {
@@ -19,28 +18,21 @@ double calculateAverage(const vector<int>& grades) {
     return grades.empty() ? 0 : sum / grades.size();
 }
 
-// Функция для получения текущей даты и времени
-string getCurrentDateTime() {
-    auto now = chrono::system_clock::now();
-    auto time_t_now = chrono::system_clock::to_time_t(now);
-    struct tm* timeinfo = localtime(&time_t_now);
 
-    stringstream ss;
-    ss << put_time(timeinfo, "%Y-%m-%d %H:%M:%S"); // Формат: YYYY-MM-DD HH:MM:SS
-    return ss.str();
-}
+
 
 void processFile(const string& inputFilename, const string& outputFilename) {
     ifstream inputFile(inputFilename);
-    ofstream outputFile(outputFilename, ios::app); // Открытие файла для добавления данных в конец
+    ofstream outputFile(outputFilename, ios::app); 
     if (!inputFile) {
         cout << "Файл не открыт!\n\n";
         return;
-    } else {
+    }
+    else {
         cout << "Файл открыт для чтения!\n\n";
     }
 
-    vector<int> grades; // Массив для хранения оценок
+    vector<int> grades; 
     int s1 = inputFile.tellg();
     int s2 = s1;
 
@@ -49,22 +41,22 @@ void processFile(const string& inputFilename, const string& outputFilename) {
     while (true) {
         if (_kbhit()) {
             char key = _getch();
-            if (key == 27) { // ESC - выход
+            if (key == 27) { 
                 cout << "\nПрограмма завершена.\n";
                 exit(0);
             }
-            if (key == 32) { // ПРОБЕЛ - пауза
+            if (key == 32) { 
                 cout << "\nМониторинг приостановлен. Нажмите ENTER для продолжения..." << endl;
                 paused = true;
             }
-            if (key == 13 && paused) { // ENTER - продолжить
+            if (key == 13 && paused) { 
                 cout << "Возобновление мониторинга...\n";
                 paused = false;
             }
         }
 
         if (paused) {
-            this_thread::sleep_for(chrono::milliseconds(200)); 
+            this_thread::sleep_for(chrono::milliseconds(200));
             continue;
         }
 
@@ -72,33 +64,34 @@ void processFile(const string& inputFilename, const string& outputFilename) {
         cout << "Файл тот же!" << endl;
         this_thread::sleep_for(chrono::seconds(3));
 
-        inputFile.clear(); // Очищаем флаг ошибки
+        inputFile.clear(); 
         inputFile.seekg(0, ios::end);
         s2 = inputFile.tellg();
 
         if (s2 != s1) {
             inputFile.seekg(0, ios::beg);
             string line;
-            grades.clear(); // Очищаем вектор оценок
+            grades.clear(); 
 
-            // Чтение оценок из файла
+            
             while (getline(inputFile, line)) {
-                int grade = stoi(line); // Преобразуем строку в число
+                int grade = stoi(line); 
                 grades.push_back(grade);
             }
 
-            double average = calculateAverage(grades); // Вычисляем среднюю оценку
+            double average = calculateAverage(grades); 
             string result = "Статус стипендии: ";
-            string dateTime = getCurrentDateTime(); // Получаем текущее время
+           
 
             if (average < 4) {
                 result += "Стипендии нет";
-            } else {
+            }
+            else {
                 result += "Стипендия доступна";
             }
 
-            // Запись результата в файл с добавлением даты и времени
-            outputFile << "[" << dateTime << "] " << result << " (Средняя оценка: " << average << ")" << endl;
+            
+            outputFile << result << " (Средняя оценка: " << average << ")" << endl;
         }
 
         inputFile.close();
@@ -109,9 +102,9 @@ void processFile(const string& inputFilename, const string& outputFilename) {
 int main() {
     setlocale(LC_ALL, "rus");
 
-    // Укажи путь к файлу тут:
-    string inputFilename = "C:\\Users\\Имя_Пользователя\\Documents\\abc.txt"; // Windows
-    string outputFilename = "C:\\Users\\Имя_Пользователя\\Documents\\result.txt"; // Путь для записи результата
+    
+    string inputFilename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.txt";
+    string outputFilename = "Z:/web_seti/seti2/result.txt"; 
 
     while (true) {
         processFile(inputFilename, outputFilename);
