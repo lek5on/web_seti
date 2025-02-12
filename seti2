@@ -38,7 +38,8 @@ void processFile(const string& inputFilename, const string& outputFilename) {
     if (!inputFile) {
         cout << "Файл не открыт!\n\n";
         return;
-    } else {
+    }
+    else {
         cout << "Файл открыт для чтения!\n\n";
     }
 
@@ -66,7 +67,7 @@ void processFile(const string& inputFilename, const string& outputFilename) {
         }
 
         if (paused) {
-            this_thread::sleep_for(chrono::milliseconds(200)); 
+            this_thread::sleep_for(chrono::milliseconds(200));
             continue;
         }
 
@@ -95,7 +96,8 @@ void processFile(const string& inputFilename, const string& outputFilename) {
 
             if (average < 4) {
                 result += "Стипендии нет";
-            } else {
+            }
+            else {
                 result += "Стипендия доступна";
             }
 
@@ -112,8 +114,8 @@ int main() {
     setlocale(LC_ALL, "rus");
 
     // Укажи путь к файлам на диске Z:
-    string inputFilename = "Z:\\abc.txt"; // Путь к файлу с оценками
-    string outputFilename = "Z:\\result.txt"; // Путь для записи результата
+    string inputFilename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.txt";
+    string outputFilename = "Z:/web_seti/seti2/result.txt";
 
     while (true) {
         processFile(inputFilename, outputFilename);
