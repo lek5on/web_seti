@@ -1,0 +1,46 @@
+#include <fstream>
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    string filename = "Z:\\web_seti\\seti-1-izmenenie_last_stroki\\seti-1-izmenenie_last_stroki\\abc.txt";  // для сервера
+    string logFilename = "Z:/web_seti/seti2/result.txt"; // для логов
+
+    while (true) {
+        cout << "\nВведите числа через пробел (или 'exit' для выхода): ";
+        string input;
+        getline(cin, input);
+
+        if (input == "exit") {
+            cout << "Выход..." << endl;
+            break;
+        }
+
+        // Открываем файл в режиме добавления
+        ofstream file(filename, ios::app);
+        if (!file) {
+            cout << "Ошибка открытия файла!" << endl;
+            return 1;
+        }
+
+        file << input << endl; // Записываем данные и добавляем перевод строки
+        file.close();
+
+        // Открываем лог-файл в режиме добавления
+        ofstream logFile(logFilename, ios::app);
+        if (!logFile) {
+            cout << "Ошибка открытия файла лога!" << endl;
+            return 1;
+        }
+        logFile << input << endl;
+        logFile.close();
+
+        cout << "Данные записаны!" << endl;
+    }
+
+    return 0;
+}
