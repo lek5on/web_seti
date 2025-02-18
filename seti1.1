@@ -1,14 +1,49 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <thread>
+#include <chrono>
 
 using namespace std;
+
+string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.txt";
+string logFilename = "Z:/web_seti/seti2/result.txt";
+
+// Функция для отслеживания изменений в файле
+void monitorLogFile() {
+    streampos lastSize = 0;
+
+    while (true) {
+        this_thread::sleep_for(chrono::seconds(1));
+
+        ifstream logFile(logFilename, ios::ate); // Открываем в конце файла
+        if (!logFile) {
+            cout << "Ошибка открытия файла лога!" << endl;
+            continue;
+        }
+
+        streampos currentSize = logFile.tellg(); // Получаем текущий размер файла
+        if (currentSize > lastSize) { // Если файл увеличился, читаем новые строки
+            logFile.seekg(lastSize); // Перемещаем указатель на место последнего чтения
+
+            string line;
+            cout << "\n[Оповещение] Новые записи в result.txt:\n";
+            while (getline(logFile, line)) {
+                cout << line << endl;
+            }
+
+            lastSize = currentSize; // Обновляем размер файла
+        }
+
+        logFile.close();
+    }
+}
 
 int main() {
     setlocale(LC_ALL, "rus");
 
-    string filename = "Z:\\web_seti\\seti-1-izmenenie_last_stroki\\seti-1-izmenenie_last_stroki\\abc.txt";  // для сервера
-    string logFilename = "Z:/web_seti/seti2/result.txt"; // для логов
+    thread monitorThread(monitorLogFile); // Запускаем поток мониторинга
+    monitorThread.detach(); // Запускаем его в фоне
 
     while (true) {
         cout << "\nВведите числа через пробел (или 'exit' для выхода): ";
@@ -20,24 +55,14 @@ int main() {
             break;
         }
 
-        // Открываем файл в режиме добавления
         ofstream file(filename, ios::app);
         if (!file) {
             cout << "Ошибка открытия файла!" << endl;
             return 1;
         }
 
-        file << input << endl; // Записываем данные и добавляем перевод строки
+        file << input << endl;
         file.close();
-
-        // Открываем лог-файл в режиме добавления
-        ofstream logFile(logFilename, ios::app);
-        if (!logFile) {
-            cout << "Ошибка открытия файла лога!" << endl;
-            return 1;
-        }
-        logFile << input << endl;
-        logFile.close();
 
         cout << "Данные записаны!" << endl;
     }
