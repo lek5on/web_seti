@@ -1,0 +1,105 @@
+#include <fstream>
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <vector>
+#include <sstream>
+
+using namespace std;
+
+string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.txt";  // Файл с текущими данными
+string resultFilename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/result.txt";  // Файл для записи результата
+string lastContent = "";  // Переменная для хранения последнего содержимого файла
+
+// Функция для чтения данных из файла
+vector<int> readNumbersFromFile(const string& filename) {
+    ifstream file(filename);
+    vector<int> numbers;
+    string content, temp;
+
+    if (!file) {
+        cout << "Ошибка открытия файла!" << endl;
+        return numbers;
+    }
+
+    // Читаем содержимое файла
+    getline(file, content, '\0');
+    file.close();
+
+    // Проверяем, изменилось ли содержимое файла
+    if (content == lastContent) {
+        return {};  // Если содержимое не изменилось, просто выходим
+    }
+    lastContent = content;  // Обновляем последнее содержимое файла
+
+    // Обрабатываем содержимое файла
+    stringstream ss(content);
+    while (ss >> temp) {
+        try {
+            numbers.push_back(stoi(temp));
+        }
+        catch (...) {
+            cout << "Ошибка преобразования числа!" << endl;
+        }
+    }
+
+    return numbers;
+}
+
+// Функция вычисления среднего балла
+double calculateAverage(const vector<int>& numbers) {
+    if (numbers.empty()) return 0.0;
+    double sum = 0;
+    for (int num : numbers) sum += num;
+    return sum / numbers.size();
+}
+
+// Функция записи результата в файл
+void writeResultToFile(const string& resultFilename, double avg) {
+    ofstream resultFile(resultFilename, ios::app);  // Открываем файл в режиме добавления
+    if (!resultFile) {
+        cout << "Ошибка открытия файла для записи!" << endl;
+        return;
+    }
+
+    resultFile << "Средний балл: " << avg << endl;
+    if (avg > 4) {
+        resultFile << "Стипендия будет!" << endl;
+    }
+    else {
+        resultFile << "Стипендии не будет!" << endl;
+    }
+    resultFile << "------------------------" << endl; // Разделитель для удобства
+
+    resultFile.close();
+}
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    cout << "Сервер запущен..." << endl;
+
+    while (true) {
+        this_thread::sleep_for(chrono::seconds(3)); // Пауза перед следующей проверкой
+
+        vector<int> numbers = readNumbersFromFile(filename);
+        if (numbers.empty()) {
+            continue;  // Если нет изменений, продолжаем ждать
+        }
+
+        cout << "\nОбнаружено обновление..." << endl;
+        double avg = calculateAverage(numbers);
+        cout << "Средний балл: " << avg << endl;
+
+        if (avg > 4) {
+            cout << "Стипендия будет!" << endl;
+        }
+        else {
+            cout << "Стипендии не будет!" << endl;
+        }
+
+        writeResultToFile(resultFilename, avg); // Записываем результат в файл
+    }
+
+    return 0;
+}
