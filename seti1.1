@@ -6,44 +6,41 @@
 
 using namespace std;
 
-string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.txt";
-string logFilename = "Z:/web_seti/seti2/result.txt";
+string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.txt";  // Файл для отправки данных
+string logFilename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/log.txt"; // Файл логов
+string file_back = "Z:/web_seti/seti2/result.txt"; // Файл с ответом от сервера
 
-// Функция для отслеживания изменений в файле
-void monitorLogFile() {
-    streampos lastSize = 0;
+// Функция очистки result.txt перед отправкой новых данных
+void clearFileBack() {
+    ofstream file(file_back, ios::trunc); // Очищаем файл
+    file.close();
+}
+
+// Функция ожидания обновления result.txt
+string waitForServerResponse() {
+    string lastResponse = "";
 
     while (true) {
-        this_thread::sleep_for(chrono::seconds(1));
+        this_thread::sleep_for(chrono::milliseconds(500)); // Ждем 500 мс перед проверкой
 
-        ifstream logFile(logFilename, ios::ate); // Открываем в конце файла
-        if (!logFile) {
-            cout << "Ошибка открытия файла лога!" << endl;
-            continue;
+        ifstream file(file_back);
+        if (!file) {
+            continue; // Если файл не доступен, пробуем снова
         }
 
-        streampos currentSize = logFile.tellg(); // Получаем текущий размер файла
-        if (currentSize > lastSize) { // Если файл увеличился, читаем новые строки
-            logFile.seekg(lastSize); // Перемещаем указатель на место последнего чтения
+        string response;
+        getline(file, response, '\0'); // Читаем весь файл
+        file.close();
 
-            string line;
-            cout << "\n[Оповещение] Новые записи в result.txt:\n";
-            while (getline(logFile, line)) {
-                cout << line << endl;
-            }
-
-            lastSize = currentSize; // Обновляем размер файла
+        if (!response.empty() && response != lastResponse) {
+            lastResponse = response;
+            return response;
         }
-
-        logFile.close();
     }
 }
 
 int main() {
     setlocale(LC_ALL, "rus");
-
-    thread monitorThread(monitorLogFile); // Запускаем поток мониторинга
-    monitorThread.detach(); // Запускаем его в фоне
 
     while (true) {
         cout << "\nВведите числа через пробел (или 'exit' для выхода): ";
@@ -55,16 +52,31 @@ int main() {
             break;
         }
 
+        clearFileBack(); // Очищаем result.txt перед отправкой новых данных
+
+        // Открываем файл в режиме добавления
         ofstream file(filename, ios::app);
         if (!file) {
             cout << "Ошибка открытия файла!" << endl;
             return 1;
         }
-
-        file << input << endl;
+        file << input << endl; // Записываем данные
         file.close();
 
-        cout << "Данные записаны!" << endl;
+        // Открываем лог-файл в режиме добавления
+        ofstream logFile(logFilename, ios::app);
+        if (!logFile) {
+            cout << "Ошибка открытия файла лога!" << endl;
+            return 1;
+        }
+        logFile << input << endl;
+        logFile.close();
+
+        cout << "Данные записаны! Ожидание ответа от сервера..." << endl;
+
+        // Ожидаем обновления file_back.txt и выводим ответ
+        string response = waitForServerResponse();
+        cout << "Ответ от сервера:\n" << response << endl;
     }
 
     return 0;
