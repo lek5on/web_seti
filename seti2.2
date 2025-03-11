@@ -1,11 +1,13 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <chrono>
+#include <thread>
 
 using namespace std;
 
-string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.bin";  // Бинарный файл с данными
-string resultFilename = "Z:/web_seti/seti2/result.bin";  // Бинарный файл для записи результата
+string filename = "Z:/web_seti/seti1.2/abc.bin";  // Бинарный файл с данными
+string resultFilename = "Z:/web_seti/seti2.1/result.bin";  // Бинарный файл для записи результата
 vector<int> lastContent;  // Переменная для хранения последнего содержимого файла
 
 // Функция для чтения данных из бинарного файла
