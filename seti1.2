@@ -1,0 +1,65 @@
+#include <fstream>
+#include <iostream>
+#include <vector>
+#include <sstream>
+
+using namespace std;
+
+string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.bin";  // Бинарный файл с текущими данными
+string logFilename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/log.txt"; // Файл логов
+
+// Функция для записи чисел в бинарный файл
+void writeNumbersToFile(const vector<int>& numbers) {
+    ofstream file(filename, ios::binary);  // Открываем файл в бинарном режиме
+    if (!file) {
+        cout << "Ошибка открытия файла!" << endl;
+        return;
+    }
+
+    // Записываем все числа в файл
+    file.write(reinterpret_cast<const char*>(numbers.data()), numbers.size() * sizeof(int));
+    file.close();
+
+    // Логирование
+    ofstream logFile(logFilename, ios::app);
+    if (!logFile) {
+        cout << "Ошибка открытия файла лога!" << endl;
+        return;
+    }
+
+    logFile << "Данные записаны: ";
+    for (int num : numbers) {
+        logFile << num << " ";
+    }
+    logFile << endl;
+    logFile.close();
+}
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    while (true) {
+        cout << "\nВведите числа через пробел (или 'exit' для выхода): ";
+        string input;
+        getline(cin, input);
+
+        if (input == "exit") {
+            cout << "Выход..." << endl;
+            break;
+        }
+
+        // Разделяем ввод на числа
+        stringstream ss(input);
+        vector<int> numbers;
+        int num;
+        while (ss >> num) {
+            numbers.push_back(num);
+        }
+
+        // Записываем числа в бинарный файл
+        writeNumbersToFile(numbers);
+        cout << "Данные записаны в файл!" << endl;
+    }
+
+    return 0;
+}
