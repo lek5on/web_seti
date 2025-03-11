@@ -1,0 +1,77 @@
+#include <fstream>
+#include <iostream>
+#include <vector>
+
+using namespace std;
+
+string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.bin";  // Бинарный файл с данными
+string resultFilename = "Z:/web_seti/seti2/result.bin";  // Бинарный файл для записи результата
+vector<int> lastContent;  // Переменная для хранения последнего содержимого файла
+
+// Функция для чтения данных из бинарного файла
+vector<int> readNumbersFromFile(const string& filename) {
+    ifstream file(filename, ios::binary);  // Открываем файл в бинарном режиме
+    vector<int> numbers;
+
+    if (!file) {
+        cout << "Ошибка открытия файла!" << endl;
+        return numbers;
+    }
+
+    // Читаем все данные из файла в вектор
+    file.seekg(0, ios::end);  // Перемещаем указатель в конец файла
+    size_t fileSize = file.tellg();  // Получаем размер файла
+    file.seekg(0, ios::beg);  // Возвращаем указатель в начало
+
+    if (fileSize == 0) {
+        return {};  // Если файл пустой, просто выходим
+    }
+
+    numbers.resize(fileSize / sizeof(int));  // Выделяем место для чисел
+    file.read(reinterpret_cast<char*>(numbers.data()), fileSize);  // Читаем бинарные данные в вектор
+    file.close();
+
+    // Проверяем, изменилось ли содержимое файла
+    if (numbers == lastContent) {
+        return {};  // Если содержимое не изменилось, просто выходим
+    }
+    lastContent = numbers;  // Обновляем последнее содержимое файла
+
+    return numbers;
+}
+
+// Функция вычисления среднего балла
+double calculateAverage(const vector<int>& numbers) {
+    if (numbers.empty()) return 0.0;
+    double sum = 0;
+    for (int num : numbers) sum += num;
+    return sum / numbers.size();
+}
+
+// Функция записи результата в бинарный файл
+void writeResultToFile(const string& resultFilename, double avg) {
+    ofstream resultFile(resultFilename, ios::binary);  // Открываем файл в бинарном режиме
+    if (!resultFile) {
+        cout << "Ошибка открытия файла для записи!" << endl;
+        return;
+    }
+
+    // Записываем результат как бинарные данные
+    resultFile.write(reinterpret_cast<const char*>(&avg), sizeof(avg));
+    resultFile.close();
+}
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    cout << "Сервер запущен..." << endl;
+
+    while (true) {
+        this_thread::sleep_for(chrono::seconds(3)); // Пауза перед следующей проверкой
+
+        vector<int> numbers = readNumbersFromFile(filename);
+        if (numbers.empty()) {
+            continue;  // Если нет изменений, продолжаем ждать
+        }
+
+       
