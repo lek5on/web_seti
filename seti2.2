@@ -74,4 +74,12 @@ int main() {
             continue;  // Если нет изменений, продолжаем ждать
         }
 
-       
+        cout << "\nОбнаружено обновление..." << endl;
+        double avg = calculateAverage(numbers);
+        cout << "Средний балл: " << avg << endl;
+
+        writeResultToFile(resultFilename, avg); // Записываем результат в бинарный файл
+    }
+
+    return 0;
+}
