@@ -1,0 +1,89 @@
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <thread>
+#include <chrono>
+
+using namespace std;
+
+string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.bin";  // Бинарный файл для отправки данных
+string logFilename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/log.txt"; // Файл логов
+string file_back = "Z:/web_seti/seti2/result.bin"; // Бинарный файл с ответом от сервера
+
+// Функция очистки result.bin перед отправкой новых данных
+void clearFileBack() {
+    ofstream file(file_back, ios::binary | ios::trunc); // Очищаем файл в бинарном режиме
+    file.close();
+}
+
+// Функция ожидания обновления result.bin
+string waitForServerResponse() {
+    string lastResponse = "";
+
+    while (true) {
+        this_thread::sleep_for(chrono::milliseconds(500)); // Ждем 500 мс перед проверкой
+
+        ifstream file(file_back, ios::binary);
+        if (!file) {
+            continue; // Если файл не доступен, пробуем снова
+        }
+
+        // Читаем весь файл в строку
+        string response;
+        char buffer[1024];
+        while (file.read(buffer, sizeof(buffer))) {
+            response.append(buffer, file.gcount());
+        }
+        response.append(buffer, file.gcount()); // Добавляем остаток, если есть
+        file.close();
+
+        if (!response.empty() && response != lastResponse) {
+            lastResponse = response;
+            return response;
+        }
+    }
+}
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    while (true) {
+        cout << "\nВведите числа через пробел (или 'exit' для выхода): ";
+        string input;
+        getline(cin, input);
+
+        if (input == "exit") {
+            cout << "Выход..." << endl;
+            break;
+        }
+
+        clearFileBack(); // Очищаем result.bin перед отправкой новых данных
+
+        // Открываем файл в бинарном режиме добавления
+        ofstream file(filename, ios::binary | ios::app);
+        if (!file) {
+            cout << "Ошибка открытия файла!" << endl;
+            return 1;
+        }
+        file.write(input.c_str(), input.size()); // Записываем данные как бинарные
+        file.write("\n", 1); // Добавляем символ новой строки
+        file.close();
+
+        // Открываем лог-файл в режиме добавления (оставляем текстовым)
+        ofstream logFile(logFilename, ios::app);
+        if (!logFile) {
+            cout << "Ошибка открытия файла лога!" << endl;
+            return 1;
+        }
+        logFile << input << endl;
+        logFile.close();
+
+        cout << "Данные записаны! Ожидание ответа от сервера..." << endl;
+
+        // Ожидаем обновления result.bin и выводим ответ
+        string response = waitForServerResponse();
+        cout << "Ответ от сервера:\n" << response << endl;
+    }
+
+    return 0;
+}
