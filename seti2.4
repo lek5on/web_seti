@@ -1,0 +1,144 @@
+#include <fstream>
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <vector>
+#include <sstream>
+
+using namespace std;
+
+string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.bin";  // Бинарный файл с текущими данными
+string resultFilename = "Z:/web_seti/seti2/result.bin";  // Бинарный файл для записи результата
+string lastContent = "";  // Переменная для хранения последнего содержимого файла
+
+// Структура для хранения данных о студенте
+struct Student {
+    string fio;
+    int age;
+    char gender;
+    vector<int> grades;
+};
+
+// Функция для чтения последней строки из бинарного файла и парсинга данных
+Student readLastStudentFromFile(const string& filename) {
+    ifstream file(filename, ios::binary);
+    Student student;
+    string content;
+
+    if (!file) {
+        cout << "Ошибка открытия файла!" << endl;
+        return student;
+    }
+
+    // Читаем весь файл
+    char buffer[1024];
+    while (file.read(buffer, sizeof(buffer))) {
+        content.append(buffer, file.gcount());
+    }
+    content.append(buffer, file.gcount());
+    file.close();
+
+    // Проверяем, изменилось ли содержимое файла
+    if (content == lastContent) {
+        return student;  // Если содержимое не изменилось, возвращаем пустую структуру
+    }
+    lastContent = content;
+
+    // Разбиваем содержимое на строки
+    stringstream ss(content);
+    string line;
+    string lastLine;
+    while (getline(ss, line)) {
+        lastLine = line; // Сохраняем последнюю строку
+    }
+
+    // Парсим последнюю строку
+    stringstream lastSS(lastLine);
+    string temp;
+    lastSS >> student.fio >> student.age >> student.gender; // Читаем ФИО, возраст, пол
+    while (lastSS >> temp) { // Читаем оценки
+        try {
+            student.grades.push_back(stoi(temp));
+        }
+        catch (...) {
+            cout << "Ошибка преобразования числа!" << endl;
+        }
+    }
+
+    return student;
+}
+
+// Функция вычисления среднего балла
+double calculateAverage(const vector<int>& grades) {
+    if (grades.empty()) return 0.0;
+    double sum = 0;
+    for (int grade : grades) sum += grade;
+    return sum / grades.size();
+}
+
+// Функция записи результата в бинарный файл
+void writeResultToFile(const string& resultFilename, const Student& student, double avg) {
+    ofstream resultFile(resultFilename, ios::binary | ios::app);  // Открываем файл в бинарном режиме добавления
+    if (!resultFile) {
+        cout << "Ошибка открытия файла для записи!" << endl;
+        return;
+    }
+
+    // Формируем строку результата
+    stringstream ss;
+    ss << "\nОбнаружено обновление...\n";
+    ss << "ФИО: " << student.fio << "\n";
+    ss << "Возраст: " << student.age << "\n";
+    ss << "Пол: " << student.gender << "\n";
+    ss << "Оценки: ";
+    for (int grade : student.grades) ss << grade << " ";
+    ss << "\nСредний балл: " << avg << "\n";
+    if (avg > 4) {
+        ss << "Стипендия будет!\n";
+    }
+    else {
+        ss << "Стипендии не будет!\n";
+    }
+    ss << "------------------------\n";
+    string result = ss.str();
+
+    // Записываем строку как бинарные данные
+    resultFile.write(result.c_str(), result.size());
+    resultFile.close();
+}
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    cout << "Сервер запущен..." << endl;
+
+    while (true) {
+        this_thread::sleep_for(chrono::seconds(3)); // Пауза перед следующей проверкой
+
+        Student student = readLastStudentFromFile(filename);
+        if (student.grades.empty() && student.fio.empty()) {
+            continue;  // Если нет изменений или данных, продолжаем ждать
+        }
+
+        cout << "\nОбнаружено обновление..." << endl;
+        cout << "ФИО: " << student.fio << endl;
+        cout << "Возраст: " << student.age << endl;
+        cout << "Пол: " << student.gender << endl;
+        cout << "Оценки: ";
+        for (int grade : student.grades) cout << grade << " ";
+        cout << endl;
+
+        double avg = calculateAverage(student.grades);
+        cout << "Средний балл: " << avg << endl;
+        if (avg > 4) {
+            cout << "Стипендия будет!" << endl;
+        }
+        else {
+            cout << "Стипендии не будет!" << endl;
+        }
+
+        writeResultToFile(resultFilename, student, avg); // Записываем результат в файл
+    }
+
+    return 0;
+}
