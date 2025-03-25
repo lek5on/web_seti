@@ -2,6 +2,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <sstream>  // Added missing header for stringstream
 
 using namespace std;
 
@@ -14,7 +15,7 @@ struct Student {
     int gradeCount;
 };
 
-string filename = "Z:/web_seti/seti1.2/abc.bin";
+string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.bin";
 string resultFilename = "Z:/web_seti/seti2/result.bin";
 long lastFileSize = 0;
 
@@ -46,8 +47,8 @@ void writeResultToFile(const Student& student, double avg) {
     ss << "\nСредний балл: " << avg << "\n";
     ss << (avg > 4 ? "Стипендия будет!\n" : "Стипендии не будет!\n");
     ss << "------------------------\n";
-    string result = ss.str();
 
+    string result = ss.str();
     resultFile.write(result.c_str(), result.size());
     resultFile.close();
 }
