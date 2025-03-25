@@ -3,6 +3,7 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <sstream>  // Added missing header for stringstream
 
 using namespace std;
 
@@ -59,29 +60,47 @@ int main() {
         }
 
         Student student = {};
-        stringstream ss(input);  // Исправленная строка
-        string fioPart, temp;
+        stringstream ss(input);
+        string temp;
         
         // Парсинг ФИО (может состоять из нескольких слов)
         string fullFio;
         while (ss >> temp) {
-            if (isdigit(temp[0])) {  // Если попалось число, это уже возраст
+            // Проверяем, является ли temp числом (возрастом)
+            bool isNumber = true;
+            for (char c : temp) {
+                if (!isdigit(c)) {
+                    isNumber = false;
+                    break;
+                }
+            }
+            if (isNumber) {
                 student.age = stoi(temp);
                 break;
             }
             fullFio += temp + " ";
         }
-        fullFio.pop_back();  // Удаляем последний пробел
-        strncpy(student.fio, fullFio.c_str(), sizeof(student.fio) - 1);
-        student.fio[sizeof(student.fio) - 1] = '\0';
-        
+        if (!fullFio.empty()) {
+            fullFio.pop_back();  // Удаляем последний пробел
+            strncpy_s(student.fio, fullFio.c_str(), sizeof(student.fio) - 1);  // Используем strncpy_s вместо strncpy
+            student.fio[sizeof(student.fio) - 1] = '\0';
+        }
+
         // Читаем пол
-        ss >> student.gender;
-        
+        if (ss >> temp) {
+            student.gender = temp[0];  // Берем первый символ
+        }
+
         // Читаем оценки
         student.gradeCount = 0;
         while (student.gradeCount < 5 && ss >> temp) {
-            student.grades[student.gradeCount++] = stoi(temp);
+            try {
+                student.grades[student.gradeCount++] = stoi(temp);
+            }
+            catch (...) {
+                cout << "Ошибка преобразования оценки: " << temp << endl;
+                student.gradeCount--;  // Откатываем счетчик, если произошла ошибка
+            }
         }
 
         clearFileBack();
