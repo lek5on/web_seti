@@ -15,8 +15,8 @@ struct Student {
     int gradeCount;   // Фактическое количество оценок
 };
 
-string filename = "Z:/web_seti/seti1.2/abc.bin";
-string logFilename = "Z:/web_seti/seti1.2/log.txt";
+string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.bin";
+string logFilename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/log.txt";
 string file_back = "Z:/web_seti/seti2/result.bin";
 
 void clearFileBack() {
@@ -59,24 +59,29 @@ int main() {
         }
 
         Student student = {};
-        stringstream ss(input`stringstream(input);
-        string fio, grade;
+        stringstream ss(input);  // Исправленная строка
+        string fioPart, temp;
         
-        // Парсинг ввода
-        ss >> fio;
+        // Парсинг ФИО (может состоять из нескольких слов)
         string fullFio;
-        while (ss.peek() != ' ' && ss >> grade) {
-            fullFio += grade + " ";
+        while (ss >> temp) {
+            if (isdigit(temp[0])) {  // Если попалось число, это уже возраст
+                student.age = stoi(temp);
+                break;
+            }
+            fullFio += temp + " ";
         }
         fullFio.pop_back();  // Удаляем последний пробел
         strncpy(student.fio, fullFio.c_str(), sizeof(student.fio) - 1);
         student.fio[sizeof(student.fio) - 1] = '\0';
         
-        ss >> student.age >> student.gender;
+        // Читаем пол
+        ss >> student.gender;
         
+        // Читаем оценки
         student.gradeCount = 0;
-        while (student.gradeCount < 5 && ss >> grade) {
-            student.grades[student.gradeCount++] = stoi(grade);
+        while (student.gradeCount < 5 && ss >> temp) {
+            student.grades[student.gradeCount++] = stoi(temp);
         }
 
         clearFileBack();
@@ -90,7 +95,7 @@ int main() {
         file.write(reinterpret_cast<const char*>(&student), sizeof(Student));
         file.close();
 
-        // Логирование в текстовый файл (без изменений)
+        // Логирование в текстовый файл
         ofstream logFile(logFilename, ios::app);
         if (!logFile) {
             cout << "Ошибка открытия файла лога!" << endl;
