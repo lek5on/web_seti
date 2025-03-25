@@ -1,0 +1,96 @@
+#include <fstream>
+#include <iostream>
+#include <thread>
+#include <chrono>
+
+using namespace std;
+
+// Структура должна быть идентична структуре в первой программе
+struct Student {
+    char fio[100];
+    int age;
+    char gender;
+    int grades[5];
+    int gradeCount;
+};
+
+string filename = "Z:/web_seti/seti-1-izmenenie_last_stroki/seti-1-izmenenie_last_stroki/abc.bin";
+string resultFilename = "Z:/web_seti/seti2/result.bin";
+long lastFileSize = 0;
+
+double calculateAverage(const Student& student) {
+    if (student.gradeCount == 0) return 0.0;
+    double sum = 0;
+    for (int i = 0; i < student.gradeCount; i++) {
+        sum += student.grades[i];
+    }
+    return sum / student.gradeCount;
+}
+
+void writeResultToFile(const Student& student, double avg) {
+    ofstream resultFile(resultFilename, ios::binary | ios::app);
+    if (!resultFile) {
+        cout << "Ошибка открытия файла для записи!" << endl;
+        return;
+    }
+
+    stringstream ss;
+    ss << "\nОбнаружено обновление...\n";
+    ss << "ФИО: " << student.fio << "\n";
+    ss << "Возраст: " << student.age << "\n";
+    ss << "Пол: " << student.gender << "\n";
+    ss << "Оценки: ";
+    for (int i = 0; i < student.gradeCount; i++) {
+        ss << student.grades[i] << " ";
+    }
+    ss << "\nСредний балл: " << avg << "\n";
+    ss << (avg > 4 ? "Стипендия будет!\n" : "Стипендии не будет!\n");
+    ss << "------------------------\n";
+    string result = ss.str();
+
+    resultFile.write(result.c_str(), result.size());
+    resultFile.close();
+}
+
+int main() {
+    setlocale(LC_ALL, "rus");
+    cout << "Сервер запущен..." << endl;
+
+    while (true) {
+        this_thread::sleep_for(chrono::seconds(3));
+
+        ifstream file(filename, ios::binary | ios::ate); // Открываем с конца
+        if (!file) continue;
+
+        long currentSize = file.tellg();
+        if (currentSize <= lastFileSize || currentSize < sizeof(Student)) {
+            file.close();
+            continue;
+        }
+
+        // Читаем последнюю структуру
+        file.seekg(currentSize - sizeof(Student), ios::beg);
+        Student student;
+        file.read(reinterpret_cast<char*>(&student), sizeof(Student));
+        file.close();
+        lastFileSize = currentSize;
+
+        cout << "\nОбнаружено обновление..." << endl;
+        cout << "ФИО: " << student.fio << endl;
+        cout << "Возраст: " << student.age << endl;
+        cout << "Пол: " << student.gender << endl;
+        cout << "Оценки: ";
+        for (int i = 0; i < student.gradeCount; i++) {
+            cout << student.grades[i] << " ";
+        }
+        cout << endl;
+
+        double avg = calculateAverage(student);
+        cout << "Средний балл: " << avg << endl;
+        cout << (avg > 4 ? "Стипендия будет!" : "Стипендии не будет!") << endl;
+
+        writeResultToFile(student, avg);
+    }
+
+    return 0;
+}
