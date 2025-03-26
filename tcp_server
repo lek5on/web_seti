@@ -1,0 +1,138 @@
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iostream>
+#include <string>
+#include <thread>
+
+#pragma comment(lib, "Ws2_32.lib")
+
+#define PORT 8080
+#define BUFFER_SIZE 1024
+
+// Функция для обработки ошибок
+void printError(const std::string& message) {
+    std::cerr << message << ": " << WSAGetLastError() << std::endl;
+    WSACleanup();
+    exit(1);
+}
+
+// Функция для чтения сообщений от клиента
+void receiveMessages(SOCKET clientSocket) {
+    char buffer[BUFFER_SIZE];
+    int bytesReceived;
+
+    while (true) {
+        bytesReceived = recv(clientSocket, buffer, BUFFER_SIZE, 0);
+        if (bytesReceived == SOCKET_ERROR) {
+            if (WSAGetLastError() == WSAEWOULDBLOCK) {
+                // Если данных нет, продолжаем ждать
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+            std::cerr << "Ошибка при получении данных: " << WSAGetLastError() << std::endl;
+            break;
+        }
+        else if (bytesReceived == 0) {
+            std::cout << "Клиент отключился\n";
+            break;
+        }
+
+        buffer[bytesReceived] = '\0';
+        std::cout << "\nКлиент: " << buffer << std::endl;
+        std::cout << "Сервер: "; // Возвращаем приглашение для ввода
+    }
+}
+
+// Функция для отправки сообщений клиенту
+void sendMessages(SOCKET clientSocket) {
+    std::string message;
+
+    while (true) {
+        std::cout << "Сервер: ";
+        std::getline(std::cin, message);
+
+        if (message == "exit") {
+            break;
+        }
+
+        if (send(clientSocket, message.c_str(), message.length(), 0) == SOCKET_ERROR) {
+            std::cerr << "Ошибка при отправке данных: " << WSAGetLastError() << std::endl;
+            break;
+        }
+    }
+}
+
+int main() {
+    // Инициализация Winsock
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        printError("Ошибка инициализации Winsock");
+    }
+
+    // Создание TCP-сокета
+    SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (serverSocket == INVALID_SOCKET) {
+        printError("Ошибка создания сокета");
+    }
+
+    // Установка неблокирующего режима для серверного сокета
+    u_long mode = 1; // 1 для неблокирующего режима
+    if (ioctlsocket(serverSocket, FIONBIO, &mode) != 0) {
+        printError("Ошибка установки неблокирующего режима для серверного сокета");
+    }
+
+    // Настройка адреса сервера
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_port = htons(PORT);
+
+    // Привязка сокета
+    if (bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        printError("Ошибка привязки сокета");
+    }
+
+    // Прослушивание входящих подключений
+    if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
+        printError("Ошибка прослушивания сокета");
+    }
+
+    std::cout << "Сервер запущен на порту " << PORT << ". Ожидание подключения...\n";
+
+    // Принятие клиента
+    SOCKET clientSocket = INVALID_SOCKET;
+    while (clientSocket == INVALID_SOCKET) {
+        sockaddr_in clientAddr;
+        int clientAddrLen = sizeof(clientAddr);
+        clientSocket = accept(serverSocket, (sockaddr*)&clientAddr, &clientAddrLen);
+        if (clientSocket == INVALID_SOCKET) {
+            if (WSAGetLastError() == WSAEWOULDBLOCK) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+            printError("Ошибка принятия клиента");
+        }
+    }
+
+    std::cout << "Клиент подключился!\n";
+
+    // Установка неблокирующего режима для клиентского сокета
+    if (ioctlsocket(clientSocket, FIONBIO, &mode) != 0) {
+        printError("Ошибка установки неблокирующего режима для клиентского сокета");
+    }
+
+    // Запуск потоков для чтения и отправки сообщений
+    std::thread receiveThread(receiveMessages, clientSocket);
+    std::thread sendThread(sendMessages, clientSocket);
+
+    sendThread.join(); // Ждем, пока пользователь не завершит отправку (ввод "exit")
+    receiveThread.join(); // Ждем завершения потока чтения
+
+    // Закрытие сокетов
+    closesocket(clientSocket);
+    closesocket(serverSocket);
+    WSACleanup();
+
+    std::cout << "Сервер завершил работу.\n";
+    return 0;
+}
