@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <atomic>
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -17,23 +18,31 @@ void printError(const std::string& message) {
 }
 
 // Функция для чтения сообщений от клиента
-void receiveMessages(SOCKET clientSocket) {
+void receiveMessages(SOCKET clientSocket, std::atomic<bool>& shouldExit) {
     char buffer[BUFFER_SIZE];
     int bytesReceived;
 
-    while (true) {
+    while (!shouldExit) {
         bytesReceived = recv(clientSocket, buffer, BUFFER_SIZE, 0);
         if (bytesReceived == SOCKET_ERROR) {
-            if (WSAGetLastError() == WSAEWOULDBLOCK) {
+            int errorCode = WSAGetLastError();
+            if (errorCode == WSAEWOULDBLOCK) {
                 // Если данных нет, продолжаем ждать
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
-            std::cerr << "Ошибка при получении данных: " << WSAGetLastError() << std::endl;
+            if (errorCode == WSAECONNRESET) {
+                std::cout << "Клиент принудительно закрыл соединение (ошибка 10054).\n";
+            }
+            else {
+                std::cerr << "Ошибка при получении данных: " << errorCode << std::endl;
+            }
+            shouldExit = true; // Устанавливаем флаг для завершения
             break;
         }
         else if (bytesReceived == 0) {
-            std::cout << "Клиент отключился\n";
+            std::cout << "Клиент корректно закрыл соединение.\n";
+            shouldExit = true; // Устанавливаем флаг для завершения
             break;
         }
 
@@ -44,19 +53,27 @@ void receiveMessages(SOCKET clientSocket) {
 }
 
 // Функция для отправки сообщений клиенту
-void sendMessages(SOCKET clientSocket) {
+void sendMessages(SOCKET clientSocket, std::atomic<bool>& shouldExit) {
     std::string message;
 
-    while (true) {
+    while (!shouldExit) {
         std::cout << "Сервер: ";
         std::getline(std::cin, message);
 
-        if (message == "exit") {
+        if (message == "exit" || shouldExit) {
+            shouldExit = true;
             break;
         }
 
         if (send(clientSocket, message.c_str(), message.length(), 0) == SOCKET_ERROR) {
-            std::cerr << "Ошибка при отправке данных: " << WSAGetLastError() << std::endl;
+            int errorCode = WSAGetLastError();
+            if (errorCode == WSAECONNRESET) {
+                std::cout << "Клиент принудительно закрыл соединение (ошибка 10054).\n";
+            }
+            else {
+                std::cerr << "Ошибка при отправке данных: " << errorCode << std::endl;
+            }
+            shouldExit = true; // Устанавливаем флаг для завершения
             break;
         }
     }
@@ -121,11 +138,15 @@ int main() {
         printError("Ошибка установки неблокирующего режима для клиентского сокета");
     }
 
+    // Флаг для синхронизации завершения потоков
+    std::atomic<bool> shouldExit(false);
+
     // Запуск потоков для чтения и отправки сообщений
-    std::thread receiveThread(receiveMessages, clientSocket);
-    std::thread sendThread(sendMessages, clientSocket);
+    std::thread receiveThread(receiveMessages, clientSocket, std::ref(shouldExit));
+    std::thread sendThread(sendMessages, clientSocket, std::ref(shouldExit));
 
     sendThread.join(); // Ждем, пока пользователь не завершит отправку (ввод "exit")
+    shouldExit = true; // Устанавливаем флаг, чтобы завершить поток чтения
     receiveThread.join(); // Ждем завершения потока чтения
 
     // Закрытие сокетов
@@ -134,5 +155,5 @@ int main() {
     WSACleanup();
 
     std::cout << "Сервер завершил работу.\n";
-    return 0;
+    return 0; // Успешное завершение
 }
