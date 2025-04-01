@@ -1,0 +1,76 @@
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iostream>
+#include <string>
+#include <thread>
+
+#pragma comment(lib, "ws2_32.lib")
+
+volatile bool running = true;
+SOCKET clientSocket;
+
+void receiveMessages() {
+    char buffer[1024];
+    while (running) {
+        int bytesReceived = recv(clientSocket, buffer, 1024, 0);
+        if (bytesReceived > 0) {
+            std::string message(buffer, bytesReceived);
+            std::cout << "\nКлиент: " << message << "\n> " << std::flush;
+        }
+        else if (bytesReceived <= 0) {
+            std::cout << "\nКлиент отключился\n";
+            running = false;
+            break;
+        }
+    }
+}
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
+
+    SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(12345);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
+    listen(serverSocket, 1);
+
+    std::cout << "Сервер запущен и ожидает первого клиента...\n";
+
+    while (true) {
+        running = true;
+
+        clientSocket = accept(serverSocket, nullptr, nullptr);
+        std::cout << "Клиент подключен. Введите сообщение (или 'exit' для выхода):\n";
+
+        std::thread receiver(receiveMessages);
+
+        while (running) {
+            std::cout << "> ";
+            std::string message;
+            std::getline(std::cin, message);
+
+            if (message == "exit") {
+                running = false;
+                break;
+            }
+
+            if (!message.empty()) {
+                send(clientSocket, message.c_str(), message.length(), 0);
+            }
+        }
+
+        receiver.join();
+        closesocket(clientSocket);
+        std::cout << "Ожидание следующего клиента...\n";
+    }
+
+    closesocket(serverSocket);
+    WSACleanup();
+    return 0;
+}
