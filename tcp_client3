@@ -2,8 +2,28 @@
 #include <ws2tcpip.h>
 #include <iostream>
 #include <string>
+#include <thread>
 
 #pragma comment(lib, "ws2_32.lib")
+
+volatile bool running = true;
+SOCKET clientSocket;
+
+void receiveMessages() {
+    char buffer[1024];
+    while (running) {
+        int bytesReceived = recv(clientSocket, buffer, 1024, 0);
+        if (bytesReceived > 0) {
+            std::string message(buffer, bytesReceived);
+            std::cout << "\nКлиент: " << message << "\n> " << std::flush;
+        }
+        else if (bytesReceived == 0) {
+            std::cout << "\nКлиент отключился\n";
+            running = false;
+            break;
+        }
+    }
+}
 
 int main() {
     setlocale(LC_ALL, "rus");
@@ -11,47 +31,39 @@ int main() {
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-    SOCKET tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
+    SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(12345);
-    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
 
-    std::cout << "Чат-бот запущен. Введите сообщение (или 'exit' для выхода):\n";
+    bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
+    listen(serverSocket, SOMAXCONN);
 
-    while (true) {
+    std::cout << "Ожидание подключения клиента...\n";
+    clientSocket = accept(serverSocket, nullptr, nullptr);
+    std::cout << "Клиент подключен. Введите сообщение (или 'exit' для выхода):\n";
+
+    std::thread receiver(receiveMessages);
+
+    while (running) {
         std::cout << "> ";
         std::string message;
         std::getline(std::cin, message);
 
-        if (message == "exit") break;
-
-        if (message.empty()) {
-            std::cout << "Сообщение не может быть пустым\n";
-            continue;
+        if (message == "exit") {
+            running = false;
+            break;
         }
 
-        // Устанавливаем соединение
-        connect(tcpSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
-
-        // Отправляем сообщение
-        send(tcpSocket, message.c_str(), message.length(), 0);
-
-        // Получаем ответ
-        char buffer[1024];
-        int bytesReceived = recv(tcpSocket, buffer, 1024, 0);
-        if (bytesReceived > 0) {
-            std::string response(buffer, bytesReceived);
-            std::cout << "Бот: " << response << "\n";
-        } else {
-            std::cout << "Ошибка получения ответа\n";
+        if (!message.empty()) {
+            send(clientSocket, message.c_str(), message.length(), 0);
         }
-
-        closesocket(tcpSocket);
-        tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
     }
 
-    closesocket(tcpSocket);
+    receiver.join();
+    closesocket(clientSocket);
+    closesocket(serverSocket);
     WSACleanup();
     return 0;
 }
