@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <chrono> // Для задержки
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -15,14 +16,35 @@ void receiveMessages() {
         int bytesReceived = recv(clientSocket, buffer, 1024, 0);
         if (bytesReceived > 0) {
             std::string message(buffer, bytesReceived);
-            std::cout << "\nКлиент: " << message << "\n> " << std::flush;
+            std::cout << "\nСервер: " << message << "\n> " << std::flush;
         }
         else if (bytesReceived <= 0) {
-            std::cout << "\nКлиент отключился\n";
+            std::cout << "\nСоединение с сервером потеряно\n";
             running = false;
             break;
         }
     }
+}
+
+bool connectToServer() {
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(12345);
+    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
+
+    while (running) {
+        std::cout << "Попытка подключения к серверу...\n";
+        if (connect(clientSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) != SOCKET_ERROR) {
+            std::cout << "Успешно подключено! Введите сообщение (или 'exit' для выхода):\n";
+            return true;
+        }
+        std::cout << "Сервер занят, ожидание...\n";
+        closesocket(clientSocket); // Закрываем неудачный сокет
+        clientSocket = socket(AF_INET, SOCK_STREAM, 0); // Создаем новый
+        std::this_thread::sleep_for(std::chrono::seconds(1)); // Ждем 1 секунду перед повторной попыткой
+    }
+    return false;
 }
 
 int main() {
@@ -31,46 +53,32 @@ int main() {
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-    SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    sockaddr_in serverAddr;
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(12345);
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
-
-    bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
-    listen(serverSocket, 1);
-
-    std::cout << "Сервер запущен и ожидает первого клиента...\n";
-
-    while (true) {
-        running = true;
-
-        clientSocket = accept(serverSocket, nullptr, nullptr);
-        std::cout << "Клиент подключен. Введите сообщение (или 'exit' для выхода):\n";
-
-        std::thread receiver(receiveMessages);
-
-        while (running) {
-            std::cout << "> ";
-            std::string message;
-            std::getline(std::cin, message);
-
-            if (message == "exit") {
-                running = false;
-                break;
-            }
-
-            if (!message.empty()) {
-                send(clientSocket, message.c_str(), message.length(), 0);
-            }
-        }
-
-        receiver.join();
-        closesocket(clientSocket);
-        std::cout << "Ожидание следующего клиента...\n";
+    if (!connectToServer()) {
+        std::cout << "Выход из программы\n";
+        WSACleanup();
+        return 1;
     }
 
-    closesocket(serverSocket);
+    std::thread receiver(receiveMessages);
+
+    while (running) {
+        std::cout << "> ";
+        std::string message;
+        std::getline(std::cin, message);
+
+        if (message == "exit") {
+            running = false;
+            break;
+        }
+
+        if (!message.empty()) {
+            send(clientSocket, message.c_str(), message.length(), 0);
+        }
+    }
+
+    receiver.join();
+    closesocket(clientSocket);
     WSACleanup();
+    std::cout << "Отключено от сервера\n";
     return 0;
 }
