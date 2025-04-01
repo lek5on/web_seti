@@ -3,149 +3,67 @@
 #include <iostream>
 #include <string>
 #include <thread>
-#include <atomic>
 
-#pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "ws2_32.lib")
 
-#define PORT 8080
-#define BUFFER_SIZE 1024
+volatile bool running = true;
+SOCKET clientSocket;
 
-void printError(const std::string& message) {
-    std::cerr << message << ": " << WSAGetLastError() << std::endl;
-    WSACleanup();
-    exit(1);
-}
-
-void receiveMessages(SOCKET clientSocket, std::atomic<bool>& shouldExit) {
-    char buffer[BUFFER_SIZE];
-    int bytesReceived;
-
-    while (!shouldExit) {
-        bytesReceived = recv(clientSocket, buffer, BUFFER_SIZE, 0);
-        if (bytesReceived == SOCKET_ERROR) {
-            int errorCode = WSAGetLastError();
-            if (errorCode == WSAEWOULDBLOCK) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                continue;
-            }
-            if (errorCode == WSAECONNRESET) {
-                std::cout << "Клиент принудительно закрыл соединение (ошибка 10054).\n";
-            }
-            else {
-                std::cerr << "Ошибка при получении данных: " << errorCode << std::endl;
-            }
-            shouldExit = true;
-            break;
+void receiveMessages() {
+    char buffer[1024];
+    while (running) {
+        int bytesReceived = recv(clientSocket, buffer, 1024, 0);
+        if (bytesReceived > 0) {
+            std::string message(buffer, bytesReceived);
+            std::cout << "\nКлиент: " << message << "\n> " << std::flush;
         }
         else if (bytesReceived == 0) {
-            std::cout << "Клиент корректно закрыл соединение.\n";
-            shouldExit = true;
-            break;
-        }
-
-        buffer[bytesReceived] = '\0';
-        if (strcmp(buffer, "SHUTDOWN") == 0) {
-            std::cout << "Клиент запросил завершение.\n";
-            shouldExit = true;
-            break;
-        }
-        std::cout << "\nКлиент: " << buffer << std::endl;
-        std::cout << "Сервер: ";
-    }
-}
-
-void sendMessages(SOCKET clientSocket, std::atomic<bool>& shouldExit) {
-    std::string message;
-
-    while (!shouldExit) {
-        std::cout << "Сервер: ";
-        std::getline(std::cin, message);
-
-        if (message == "exit") {
-            send(clientSocket, "SHUTDOWN", 8, 0); // Уведомляем клиента о завершении
-            shouldExit = true;
-            break;
-        }
-
-        if (send(clientSocket, message.c_str(), message.length(), 0) == SOCKET_ERROR) {
-            int errorCode = WSAGetLastError();
-            if (errorCode == WSAECONNRESET) {
-                std::cout << "Клиент принудительно закрыл соединение (ошибка 10054).\n";
-            }
-            else {
-                std::cerr << "Ошибка при отправке данных: " << errorCode << std::endl;
-            }
-            shouldExit = true;
+            std::cout << "\nКлиент отключился\n";
+            running = false;
             break;
         }
     }
 }
 
 int main() {
+    setlocale(LC_ALL, "rus");
+
     WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        printError("Ошибка инициализации Winsock");
-    }
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-    SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (serverSocket == INVALID_SOCKET) {
-        printError("Ошибка создания сокета");
-    }
-
-    u_long mode = 1;
-    if (ioctlsocket(serverSocket, FIONBIO, &mode) != 0) {
-        printError("Ошибка установки неблокирующего режима для серверного сокета");
-    }
-
+    SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(12345);
     serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(PORT);
 
-    if (bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        printError("Ошибка привязки сокета");
-    }
+    bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
+    listen(serverSocket, SOMAXCONN);
 
-    if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
-        printError("Ошибка прослушивания сокета");
-    }
+    std::cout << "Ожидание подключения клиента...\n";
+    clientSocket = accept(serverSocket, nullptr, nullptr);
+    std::cout << "Клиент подключен. Введите сообщение (или 'exit' для выхода):\n";
 
-    std::cout << "Сервер запущен на порту " << PORT << ". Ожидание подключения...\n";
+    std::thread receiver(receiveMessages);
 
-    SOCKET clientSocket = INVALID_SOCKET;
-    while (clientSocket == INVALID_SOCKET) {
-        sockaddr_in clientAddr;
-        int clientAddrLen = sizeof(clientAddr);
-        clientSocket = accept(serverSocket, (sockaddr*)&clientAddr, &clientAddrLen);
-        if (clientSocket == INVALID_SOCKET) {
-            if (WSAGetLastError() == WSAEWOULDBLOCK) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                continue;
-            }
-            printError("Ошибка принятия клиента");
+    while (running) {
+        std::cout << "> ";
+        std::string message;
+        std::getline(std::cin, message);
+
+        if (message == "exit") {
+            running = false;
+            break;
+        }
+
+        if (!message.empty()) {
+            send(clientSocket, message.c_str(), message.length(), 0);
         }
     }
 
-    std::cout << "Клиент подключился!\n";
-
-    if (ioctlsocket(clientSocket, FIONBIO, &mode) != 0) {
-        printError("Ошибка установки неблокирующего режима для клиентского сокета");
-    }
-
-    std::atomic<bool> shouldExit(false);
-
-    std::thread receiveThread(receiveMessages, clientSocket, std::ref(shouldExit));
-    std::thread sendThread(sendMessages, clientSocket, std::ref(shouldExit));
-
-    sendThread.join();
-    shouldExit = true;
-    receiveThread.join();
-
-    shutdown(clientSocket, SD_BOTH); // Корректное завершение соединения
+    receiver.join();
     closesocket(clientSocket);
     closesocket(serverSocket);
     WSACleanup();
-
-    std::cout << "Сервер завершил работу.\n";
     return 0;
 }
