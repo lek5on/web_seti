@@ -5,58 +5,44 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-std::string processMessage(const std::string& message) {
-    // Простая логика обработки сообщений
-    if (message.find("привет") != std::string::npos) {
-        return "Привет! Чем могу помочь?";
-    }
-    else if (message.find("пока") != std::string::npos) {
-        return "До свидания!";
-    }
-    else if (message.find("как дела") != std::string::npos) {
-        return "У меня всё отлично, спасибо!";
-    }
-    else {
-        return "Вы сказали: " + message + ". Я простой бот, напишите 'привет', 'как дела' или 'пока'!";
-    }
-}
-
 int main() {
     setlocale(LC_ALL, "rus");
 
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-    SOCKET tcpServerSocket = socket(AF_INET, SOCK_STREAM, 0);
+    // Создаем UDP сокет
+    SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+
+    // Настраиваем адрес сервера
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(12345);
     serverAddr.sin_addr.s_addr = INADDR_ANY;
+    bind(udpSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
 
-    bind(tcpServerSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
-    listen(tcpServerSocket, SOMAXCONN);
-
-    std::cout << "Сервер чат-бота запущен\n";
+    std::cout << "UDP-сервер запущен и ожидает сообщений...\n";
 
     while (true) {
-        SOCKET clientSocket = accept(tcpServerSocket, nullptr, nullptr);
-
+        // Получаем сообщение от клиента
         char buffer[1024];
-        int bytesReceived = recv(clientSocket, buffer, 1024, 0);
+        sockaddr_in clientAddr;
+        int clientLen = sizeof(clientAddr);
+        int bytesReceived = recvfrom(udpSocket, buffer, 1024, 0, 
+                                   (sockaddr*)&clientAddr, &clientLen);
+
         if (bytesReceived > 0) {
             std::string message(buffer, bytesReceived);
-            std::cout << "Клиент: " << message << "\n";
+            std::cout << "Получено от клиента: " << message << "\n";
 
-            std::string response = processMessage(message);
-            std::cout << "Бот: " << response << "\n";
-
-            send(clientSocket, response.c_str(), response.length(), 0);
+            // Отправляем эхо обратно
+            sendto(udpSocket, message.c_str(), message.length(), 0, 
+                   (sockaddr*)&clientAddr, sizeof(clientAddr));
+            std::cout << "Отправлено эхо клиенту\n";
         }
-
-        closesocket(clientSocket);
     }
 
-    closesocket(tcpServerSocket);
+    closesocket(udpSocket);
     WSACleanup();
     return 0;
 }
