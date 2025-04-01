@@ -2,28 +2,8 @@
 #include <ws2tcpip.h>
 #include <iostream>
 #include <string>
-#include <thread>
 
 #pragma comment(lib, "ws2_32.lib")
-
-volatile bool running = true;
-SOCKET clientSocket;
-
-void receiveMessages() {
-    char buffer[1024];
-    while (running) {
-        int bytesReceived = recv(clientSocket, buffer, 1024, 0);
-        if (bytesReceived > 0) {
-            std::string message(buffer, bytesReceived);
-            std::cout << "\nКлиент: " << message << "\n> " << std::flush;
-        }
-        else if (bytesReceived == 0) {
-            std::cout << "\nКлиент отключился\n";
-            running = false;
-            break;
-        }
-    }
-}
 
 int main() {
     setlocale(LC_ALL, "rus");
@@ -31,39 +11,57 @@ int main() {
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-    SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    // Создаем UDP сокет
+    SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+
+    // Настраиваем адрес сервера
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(12345);
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
-    bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
-    listen(serverSocket, SOMAXCONN);
+    // Настраиваем локальный адрес клиента
+    sockaddr_in clientAddr;
+    clientAddr.sin_family = AF_INET;
+    clientAddr.sin_port = htons(54321);
+    clientAddr.sin_addr.s_addr = INADDR_ANY;
+    bind(udpSocket, (sockaddr*)&clientAddr, sizeof(clientAddr));
 
-    std::cout << "Ожидание подключения клиента...\n";
-    clientSocket = accept(serverSocket, nullptr, nullptr);
-    std::cout << "Клиент подключен. Введите сообщение (или 'exit' для выхода):\n";
+    std::cout << "UDP-клиент запущен. Введите сообщение (или 'exit' для выхода):\n";
 
-    std::thread receiver(receiveMessages);
-
-    while (running) {
+    while (true) {
         std::cout << "> ";
         std::string message;
         std::getline(std::cin, message);
 
-        if (message == "exit") {
-            running = false;
-            break;
+        if (message == "exit") break;
+
+        if (message.empty()) {
+            std::cout << "Сообщение не может быть пустым\n";
+            continue;
         }
 
-        if (!message.empty()) {
-            send(clientSocket, message.c_str(), message.length(), 0);
+        // Отправляем сообщение серверу
+        sendto(udpSocket, message.c_str(), message.length(), 0, 
+               (sockaddr*)&serverAddr, sizeof(serverAddr));
+
+        // Получаем эхо-ответ
+        char buffer[1024];
+        sockaddr_in fromAddr;
+        int fromLen = sizeof(fromAddr);
+        int bytesReceived = recvfrom(udpSocket, buffer, 1024, 0, 
+                                   (sockaddr*)&fromAddr, &fromLen);
+
+        if (bytesReceived > 0) {
+            std::string response(buffer, bytesReceived);
+            std::cout << "Эхо от сервера: " << response << "\n";
+        }
+        else {
+            std::cout << "Ошибка получения ответа\n";
         }
     }
 
-    receiver.join();
-    closesocket(clientSocket);
-    closesocket(serverSocket);
+    closesocket(udpSocket);
     WSACleanup();
     return 0;
 }
