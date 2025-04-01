@@ -3,129 +3,68 @@
 #include <iostream>
 #include <string>
 #include <thread>
-#include <atomic>
 
-#pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "ws2_32.lib")
 
-#define PORT 8080
-#define BUFFER_SIZE 1024
+volatile bool running = true;
+SOCKET clientSocket;
 
-void printError(const std::string& message) {
-    std::cerr << message << ": " << WSAGetLastError() << std::endl;
-    WSACleanup();
-    exit(1);
-}
-
-void receiveMessages(SOCKET serverSocket, std::atomic<bool>& shouldExit) {
-    char buffer[BUFFER_SIZE];
-    int bytesReceived;
-
-    while (!shouldExit) {
-        bytesReceived = recv(serverSocket, buffer, BUFFER_SIZE, 0);
-        if (bytesReceived == SOCKET_ERROR) {
-            int errorCode = WSAGetLastError();
-            if (errorCode == WSAEWOULDBLOCK) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                continue;
-            }
-            if (errorCode == WSAECONNRESET) {
-                std::cout << "Сервер принудительно закрыл соединение (ошибка 10054).\n";
-            }
-            else {
-                std::cerr << "Ошибка при получении данных: " << errorCode << std::endl;
-            }
-            shouldExit = true;
-            break;
+void receiveMessages() {
+    char buffer[1024];
+    while (running) {
+        int bytesReceived = recv(clientSocket, buffer, 1024, 0);
+        if (bytesReceived > 0) {
+            std::string message(buffer, bytesReceived);
+            std::cout << "\nСервер: " << message << "\n> " << std::flush;
         }
         else if (bytesReceived == 0) {
-            std::cout << "Сервер корректно закрыл соединение.\n";
-            shouldExit = true;
-            break;
-        }
-
-        buffer[bytesReceived] = '\0';
-        if (strcmp(buffer, "SHUTDOWN") == 0) {
-            std::cout << "Сервер запросил завершение.\n";
-            shouldExit = true;
-            break;
-        }
-        std::cout << "\nСервер: " << buffer << std::endl;
-        std::cout << "Клиент: ";
-    }
-}
-
-void sendMessages(SOCKET serverSocket, std::atomic<bool>& shouldExit) {
-    std::string message;
-
-    while (!shouldExit) {
-        std::cout << "Клиент: ";
-        std::getline(std::cin, message);
-
-        if (message == "exit") {
-            send(serverSocket, "SHUTDOWN", 8, 0); // Уведомляем сервер о завершении
-            shouldExit = true;
-            break;
-        }
-
-        if (send(serverSocket, message.c_str(), message.length(), 0) == SOCKET_ERROR) {
-            int errorCode = WSAGetLastError();
-            if (errorCode == WSAECONNRESET) {
-                std::cout << "Сервер принудительно закрыл соединение (ошибка 10054).\n";
-            }
-            else {
-                std::cerr << "Ошибка при отправке данных: " << errorCode << std::endl;
-            }
-            shouldExit = true;
+            std::cout << "\nСоединение закрыто сервером\n";
+            running = false;
             break;
         }
     }
 }
 
 int main() {
+    setlocale(LC_ALL, "rus");
+
     WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        printError("Ошибка инициализации Winsock");
-    }
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-    SOCKET clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (clientSocket == INVALID_SOCKET) {
-        printError("Ошибка создания сокета");
-    }
-
-    u_long mode = 1;
-    if (ioctlsocket(clientSocket, FIONBIO, &mode) != 0) {
-        printError("Ошибка установки неблокирующего режима");
-    }
-
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(PORT);
+    serverAddr.sin_port = htons(12345);
     inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
-    while (connect(clientSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        if (WSAGetLastError() == WSAEWOULDBLOCK || WSAGetLastError() == WSAECONNREFUSED) {
-            std::cout << "Ожидание подключения к серверу...\n";
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            continue;
-        }
-        printError("Ошибка подключения к серверу");
+    if (connect(clientSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        std::cout << "Не удалось подключиться к серверу\n";
+        closesocket(clientSocket);
+        WSACleanup();
+        return 1;
     }
 
-    std::cout << "Подключено к серверу!\n";
+    std::cout << "Подключено к серверу. Введите сообщение (или 'exit' для выхода):\n";
 
-    std::atomic<bool> shouldExit(false);
+    std::thread receiver(receiveMessages);
 
-    std::thread receiveThread(receiveMessages, clientSocket, std::ref(shouldExit));
-    std::thread sendThread(sendMessages, clientSocket, std::ref(shouldExit));
+    while (running) {
+        std::cout << "> ";
+        std::string message;
+        std::getline(std::cin, message);
 
-    sendThread.join();
-    shouldExit = true;
-    receiveThread.join();
+        if (message == "exit") {
+            running = false;
+            break;
+        }
 
-    shutdown(clientSocket, SD_BOTH); // Корректное завершение соединения
+        if (!message.empty()) {
+            send(clientSocket, message.c_str(), message.length(), 0);
+        }
+    }
+
+    receiver.join();
     closesocket(clientSocket);
     WSACleanup();
-
-    std::cout << "Клиент завершил работу.\n";
     return 0;
 }
