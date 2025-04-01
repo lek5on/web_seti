@@ -1,0 +1,57 @@
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iostream>
+#include <string>
+
+#pragma comment(lib, "ws2_32.lib")
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
+
+    SOCKET tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(12345);
+    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
+
+    std::cout << "Чат-бот запущен. Введите сообщение (или 'exit' для выхода):\n";
+
+    while (true) {
+        std::cout << "> ";
+        std::string message;
+        std::getline(std::cin, message);
+
+        if (message == "exit") break;
+
+        if (message.empty()) {
+            std::cout << "Сообщение не может быть пустым\n";
+            continue;
+        }
+
+        // Устанавливаем соединение
+        connect(tcpSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
+
+        // Отправляем сообщение
+        send(tcpSocket, message.c_str(), message.length(), 0);
+
+        // Получаем ответ
+        char buffer[1024];
+        int bytesReceived = recv(tcpSocket, buffer, 1024, 0);
+        if (bytesReceived > 0) {
+            std::string response(buffer, bytesReceived);
+            std::cout << "Бот: " << response << "\n";
+        } else {
+            std::cout << "Ошибка получения ответа\n";
+        }
+
+        closesocket(tcpSocket);
+        tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
+    }
+
+    closesocket(tcpSocket);
+    WSACleanup();
+    return 0;
+}
