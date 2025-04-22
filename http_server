@@ -72,7 +72,7 @@ int main() {
     // Настраиваем адрес сервера
     server_addr.sin_family = AF_INET; // Используем IPv4
     server_addr.sin_addr.s_addr = INADDR_ANY; // Принимаем соединения на всех интерфейсах
-    server_addr.sin_port = htons(8082); // Порт 8082
+    server_addr.sin_port = htons(8080); // Порт 8080
 
     // Привязываем сокет к адресу и порту
     if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
@@ -90,7 +90,7 @@ int main() {
         return 1;
     }
 
-    std::cout << "Сервер запущен. Порт 8082" << std::endl;
+    std::cout << "Сервер запущен. Порт 8080" << std::endl;
 
     // Цикл для принятия клиентских подключений
     while (true) {
