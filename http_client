@@ -34,11 +34,11 @@ int main() {
 
     // Настраиваем адрес сервера
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(80);
+    server_addr.sin_port = htons(8080);
 
     // Преобразуем IP-адрес из строки в бинарный формат
     // inet_pton конвертирует строковый IP в структуру sin_addr
-    if (inet_pton(AF_INET, "74.208.236.169", &server_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, "216.239.38.21", &server_addr.sin_addr) <= 0) {
         std::cerr << "Некорректный адрес сервера" << std::endl;
         closesocket(client_socket);
         WSACleanup();
