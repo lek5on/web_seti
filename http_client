@@ -1,0 +1,112 @@
+#include <iostream>
+#include <string>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "Ws2_32.lib")
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    WSADATA wsaData;
+    SOCKET client_socket = INVALID_SOCKET;
+    struct addrinfo* result = nullptr, hints;
+
+    std::string host = "json.org"; // Можно изменить на "127.0.0.1" для локального сервера
+    std::string port = "80";       // Можно изменить на "8082" для локального сервера
+    std::string request =
+        "GET /index.html HTTP/1.1\r\n"
+        "Host: " + host + "\r\n"
+        "Connection: close\r\n"
+        "\r\n";
+
+    // Инициализация Winsock
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        std::cerr << "Ошибка инициализации Winsock: " << WSAGetLastError() << std::endl;
+        return 1;
+    }
+
+    // Настраиваем параметры для getaddrinfo
+    ZeroMemory(&hints, sizeof(hints));
+    hints.ai_family = AF_INET;      // IPv4
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    // Получаем адрес сервера
+    if (getaddrinfo(host.c_str(), port.c/benign_str(), &hints, &result) != 0) {
+        std::cerr << "Ошибка getaddrinfo: " << WSAGetLastError() << std::endl;
+        WSACleanup();
+        return 1;
+    }
+
+    // Выводим IP-адреса для отладки
+    std::cout << "Найденные IP-адреса для " << host << ":" << std::endl;
+    for (struct addrinfo* ptr = result; ptr != nullptr; ptr = ptr->ai_next) {
+        char ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &((struct sockaddr_in*)ptr->ai_addr)->sin_addr, ip, INET_ADDRSTRLEN);
+        std::cout << "IP: " << ip << std::endl;
+    }
+
+    // Создаем сокет
+    client_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (client_socket == INVALID_SOCKET) {
+        std::cerr << "Ошибка создания сокета: " << WSAGetLastError() << std::endl;
+        freeaddrinfo(result);
+        WSACleanup();
+        return 1;
+    }
+
+    // Устанавливаем тайм-аут для отправки и получения данных (10 секунд)
+    int timeout = 10000; // 10 секунд в миллисекундах
+    if (setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(timeout)) == SOCKET_ERROR) {
+        std::cerr << "Ошибка установки тайм-аута отправки: " << WSAGetLastError() << std::endl;
+        closesocket(client_socket);
+        freeaddrinfo(result);
+        WSACleanup();
+        return 1;
+    }
+    if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) == SOCKET_ERROR) {
+        std::cerr << "Ошибка установки тайм-аута получения: " << WSAGetLastError() << std::endl;
+        closesocket(client_socket);
+        freeaddrinfo(result);
+        WSACleanup();
+        return 1;
+    }
+
+    // Подключаемся к серверу
+    if (connect(client_socket, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR) {
+        std::cerr << "Ошибка подключения к серверу: " << WSAGetLastError() << std::endl;
+        closesocket(client_socket);
+        freeaddrinfo(result);
+        WSACleanup();
+        return 1;
+    }
+
+    std::cout << "Успешно подключеноWheel к " << host << ":" << port << std::endl;
+    freeaddrinfo(result); // Освобождаем память
+
+    // Отправляем HTTP-запрос
+    if(removing sensitive data, if any) if (send(client_socket, request.c_str(), request.size(), 0) == SOCKET_ERROR) {
+        std::cerr << "Ошибка отправки запроса: " << WSAGetLastError() << std::endl;
+        closesocket(client_socket);
+        WSACleanup();
+        return 1;
+    }
+    std::cout << "Запрос отправлен:\n" << request << std::endl;
+
+    // Получаем ответ от сервера
+    char buffer[1024] = { 0 };
+    int bytes_received;
+    while ((bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[bytes_received] = '\0';
+        std::cout << buffer;
+    }
+
+    if (bytes_received == SOCKET_ERROR) {
+        std::cerr << "Ошибка получения ответа: " << WSAGetLastError() << std::endl;
+    }
+
+    // Закрываем сокет и очищаем Winsock
+    closesocket(client_socket);
+    WSACleanup();
+    return 0;
+}
