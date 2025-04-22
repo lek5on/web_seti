@@ -1,0 +1,109 @@
+#include <iostream>
+#include <string>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "Ws2_32.lib")
+
+// Функция для обработки подключения клиента
+void handle_client(SOCKET client_socket) { // SOCKET client_socket — дескриптор сокета для общения с клиентом
+    char buffer[1024];
+    std::string request;    // Переменная для накопления полного HTTP-запроса
+    int bytes_received;     // Переменная для хранения количества принятых байтов
+
+    // Цикл для чтения данных от клиента, читаем пока есть данные
+    do {
+        bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
+        // Если данные получены
+        if (bytes_received > 0) {
+            buffer[bytes_received] = '\0';
+            request += buffer;  // Добавляем принятые данные к строке request
+
+            // Проверяем, получен ли конец HTTP-запроса (две последовательные пустые строки: \r\n\r\n)
+            if (request.find("\r\n\r\n") != std::string::npos) {
+                break;
+            }
+        }
+    } while (bytes_received > 0); // Продолжаем, пока клиент отправляет данные
+
+    // Проверяем, является ли запрос GET-запросом, начинается ли строка request с "GET"
+    if (request.find("GET") == 0) {
+        std::string response_body = "<html><body><h1>Привет от HTTP-сервера на C++!</h1></body></html>"; // Страница, которая будет отправлена клиенту
+        // HTTP ответ
+        std::string response =
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html\r\n"
+            "Content-Length: " + std::to_string(response_body.size()) + "\r\n"
+            "Connection: close\r\n"
+            "\r\n" +
+            response_body;
+
+        // Отправляем ответ клиенту
+        send(client_socket, response.c_str(), response.size(), 0);
+    }
+
+    // Завершаем отправку данных клиенту
+    shutdown(client_socket, SD_SEND);
+    closesocket(client_socket);
+}
+
+int main() {
+    setlocale(LC_ALL, "rus");
+
+    WSADATA wsaData;
+    SOCKET server_socket, client_socket;
+    // Структуры для хранения адресов сервера и клиента
+    struct sockaddr_in server_addr, client_addr;
+    // Размер структуры адреса клиента
+    int addr_len = sizeof(client_addr);
+
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        std::cerr << "Ошибка инициализации WSAStartup: " << WSAGetLastError() << std::endl;
+        return 1;
+    }
+
+    // Создаём TCP-сокет для сервера
+    server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (server_socket == INVALID_SOCKET) {
+        std::cerr << "Ошибка создания сокета: " << WSAGetLastError() << std::endl;
+        WSACleanup();
+        return 1;
+    }
+
+    // Настраиваем адрес сервера
+    server_addr.sin_family = AF_INET; // Используем IPv4
+    server_addr.sin_addr.s_addr = INADDR_ANY; // Принимаем соединения на всех интерфейсах
+    server_addr.sin_port = htons(8082); // Порт 8082
+
+    // Привязываем сокет к адресу и порту
+    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
+        std::cerr << "Ошибка привязки (bind): " << WSAGetLastError() << std::endl;
+        closesocket(server_socket);
+        WSACleanup();
+        return 1;
+    }
+
+    // Начинаем прослушивание входящих подключений, где SOMAXCONN — максимальная очередь подключений
+    if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) {
+        std::cerr << "Ошибка прослушивания (listen): " << WSAGetLastError() << std::endl;
+        closesocket(server_socket);
+        WSACleanup();
+        return 1;
+    }
+
+    std::cout << "Сервер запущен. Порт 8082" << std::endl;
+
+    // Цикл для принятия клиентских подключений
+    while (true) {
+        client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &addr_len);   // client_addr сохраняет адрес клиента
+        if (client_socket == INVALID_SOCKET) {
+            std::cerr << "Ошибка при приёме подключения (accept): " << WSAGetLastError() << std::endl;
+            continue;
+        }
+        // Обрабатываем клиента 
+        handle_client(client_socket);
+    }
+
+    closesocket(server_socket);
+    WSACleanup();
+    return 0;
+}
