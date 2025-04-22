@@ -32,7 +32,7 @@ int main() {
     hints.ai_protocol = IPPROTO_TCP;
 
     // Получаем адрес сервера
-    if (getaddrinfo(host.c_str(), port.c/benign_str(), &hints, &result) != 0) {
+    if (getaddrinfo(host.c_str(), port.c_str(), &hints, &result) != 0) {
         std::cerr << "Ошибка getaddrinfo: " << WSAGetLastError() << std::endl;
         WSACleanup();
         return 1;
@@ -81,11 +81,11 @@ int main() {
         return 1;
     }
 
-    std::cout << "Успешно подключеноWheel к " << host << ":" << port << std::endl;
+    std::cout << "Успешно подключено к " << host << ":" << port << std::endl;
     freeaddrinfo(result); // Освобождаем память
 
     // Отправляем HTTP-запрос
-    if(removing sensitive data, if any) if (send(client_socket, request.c_str(), request.size(), 0) == SOCKET_ERROR) {
+    if (send(client_socket, request.c_str(), request.size(), 0) == SOCKET_ERROR) {
         std::cerr << "Ошибка отправки запроса: " << WSAGetLastError() << std::endl;
         closesocket(client_socket);
         WSACleanup();
